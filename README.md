@@ -11,7 +11,7 @@ If you don't have a `.claude/commands/` directory yet:
 ```bash
 cd ~
 mkdir -p .claude
-git clone git@github.com:YOUR_USERNAME/team-claude-commands.git .claude/commands
+git clone https://github.com/ChrisJNEsc/team-claude-commands.git .claude/commands
 ```
 
 ### Option 2: Existing Commands Directory (Recommended)
@@ -20,7 +20,7 @@ If you already have commands in `.claude/commands/`, use a subdirectory approach
 
 ```bash
 cd ~/.claude/commands/
-git clone git@github.com:YOUR_USERNAME/team-claude-commands.git team
+git clone https://github.com/ChrisJNEsc/team-claude-commands.git team
 ```
 
 Your commands will be available as `/team/bulk-fetch`, `/team/devtools`, etc.
@@ -31,7 +31,7 @@ If your `.claude` directory is already a git repository:
 
 ```bash
 cd ~/.claude
-git submodule add git@github.com:YOUR_USERNAME/team-claude-commands.git commands
+git submodule add https://github.com/ChrisJNEsc/team-claude-commands.git commands
 git submodule update --init --recursive
 ```
 
