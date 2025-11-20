@@ -37,13 +37,13 @@ git submodule update --init --recursive
 
 ## Available Commands
 
-- `/bulk-update` - Bulk update operations
-- `/devtools` - Development tools helper
-- `/hscheck` - Health and safety check
-- `/investigateline` - Investigate specific code lines
-- `/newreq` - Create new requirement
-- `/similar-issues` - Find similar issues
-- `/triage` - Issue triage helper
+- `/bulk-update` - Bulk update repos
+- `/devtools` - Dev Tools Doctor (Requires .har)
+- `/hscheck` - Hubspot Ticket Counter via Linear.
+- `/investigateline` - Check Duplicate Linears > Check GitHub + Gen Fix Plan > Create Linear
+- `/newreq` - Investigate line without searching GitHub
+- `/similar-issues` - Find similar issues in linear
+- `/triage` - Test Command
 
 ## Updating Commands
 
@@ -107,4 +107,5 @@ Detailed instructions for Claude to follow...
 ## License
 
 [Choose your license - MIT, Apache 2.0, etc.]
+
 
