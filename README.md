@@ -23,7 +23,7 @@ cd ~/.claude/commands/
 git clone https://github.com/ChrisJNEsc/team-claude-commands.git team
 ```
 
-Your commands will be available as `/team/bulk-fetch`, `/team/devtools`, etc.
+Your commands will be available as `/team/bulk-update`, `/team/devtools`, etc.
 
 ### Option 3: Git Submodule (Most Maintainable)
 
@@ -37,7 +37,7 @@ git submodule update --init --recursive
 
 ## Available Commands
 
-- `/bulk-fetch` - Bulk fetch operations
+- `/bulk-update` - Bulk update operations
 - `/devtools` - Development tools helper
 - `/hscheck` - Health and safety check
 - `/investigateline` - Investigate specific code lines
