@@ -82,7 +82,17 @@ Brief description of what this command does.
 
 Detailed instructions for Claude to follow...
 ```
+##Token Efficiency Principles
+  - The 3 Laws:
+  1. Minimize round trips → Batch questions, parallel tool calls
+    - Bad: 10 sequential questions = 10 user waits + 10 AI responses
+    - Good: 1 question with 10 fields = 1 interaction
+  2. Be specific, not verbose → Examples > explanations
+  3. Context on demand → Don’t front-load. Use tools when needed.
+    - Bad: 300-line team mapping upfront (AI reads every token every time)
+    - Best: Separate tool/file that AI calls only when needed
 
+     
 ## Troubleshooting
 
 **Commands not showing up?**
@@ -97,3 +107,4 @@ Detailed instructions for Claude to follow...
 ## License
 
 [Choose your license - MIT, Apache 2.0, etc.]
+
