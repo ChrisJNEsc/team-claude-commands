@@ -77,7 +77,7 @@ Use `create_issue` with:
 - Title: from step 1
 - Description: formatted template (see below)
 - Priority: from step 5 (Urgent=1, High=2, Normal=3, Low=4)
-- Label: "Bug-Customer Reported"
+- Label: "Bug - Customer Reported"
 - State: "Triage"
 
 ### 7. Confirm Creation
@@ -161,7 +161,7 @@ If still unclear, ask user to select from: Fulfillment, CoreCRM, Marketing, Acco
 
 ## Important Notes
 - Always check for duplicates before creating tickets
-- Always set state="Triage" and label="Bug-Customer Reported"
+- Always set state="Triage" and label="Bug - Customer Reported"
 - Code investigation is optional - ask once early in process
 - If investigation not performed, set those sections to "N/A"
 - Batch user questions to minimize interactions
