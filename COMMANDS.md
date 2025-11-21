@@ -2,17 +2,17 @@
 
 Detailed documentation for all available commands.
 
-## /bulk-fetch
+## /bulk-pull
 
-**Purpose:** Bulk fetch all git repositories in a directory
+**Purpose:** Bulk update all git repositories in a directory
 
-**Usage:** `/bulk-fetch`
+**Usage:** `/bulk-pull`
 
-**Description:** Runs `git fetch origin` on all repositories in `/Users/chrisberry/Documents/GitHub`. Provides status updates and a summary of successful/failed fetches.
+**Description:** Runs `git pull` on all repositories in `/Users/chrisberry/Documents/GitHub`. Provides status updates and a summary of successful/failed pulls.
 
 **Use Cases:**
 - Keep all local repositories up to date
-- Check for updates across multiple projects
+- Pull latest changes across multiple projects
 - Batch operations before starting work
 
 ---
@@ -45,16 +45,18 @@ Detailed documentation for all available commands.
 
 ## /investigateline
 
-**Purpose:** Investigate specific code lines
+**Purpose:** Create Linear tickets for customer-reported bugs with optional code investigation
 
-**Usage:** `/investigateline [file:line]`
+**Usage:** `/investigateline`
 
-**Description:** Deep investigation of specific lines of code, including context, dependencies, and potential issues.
+**Description:** Comprehensive workflow for creating customer bug reports in Linear. Checks for duplicate issues, gathers detailed reproduction steps and customer information, optionally investigates related code and creates fix plans, then creates a properly formatted Linear ticket with the "Bug - Customer Reported" label in Triage state.
 
 **Use Cases:**
-- Understanding complex code sections
-- Debugging specific lines
-- Code review investigations
+- Creating customer-reported bug tickets
+- Investigating code related to customer issues
+- Generating fix plans for bugs
+- Ensuring consistent bug report formatting
+- Avoiding duplicate issue creation
 
 ---
 
