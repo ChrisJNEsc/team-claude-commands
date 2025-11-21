@@ -23,7 +23,7 @@ cd ~/.claude/commands/
 git clone https://github.com/ChrisJNEsc/team-claude-commands.git team
 ```
 
-Your commands will be available as `/team/bulk-update`, `/team/devtools`, etc.
+Your commands will be available as `/team/bulk-pull`, `/team/devtools`, etc.
 
 ### Option 3: Git Submodule (Most Maintainable)
 
@@ -37,7 +37,7 @@ git submodule update --init --recursive
 
 ## Available Commands
 
-- `/bulk-update` - Bulk update repos
+- `/bulk-pull` - Bulk update all repositories with git pull
 - `/devtools` - Dev Tools Doctor (Requires .har)
 - `/hscheck` - Hubspot Ticket Counter via Linear.
 - `/investigateline` - Check Duplicate Linears > Check GitHub + Gen Fix Plan > Create Linear
