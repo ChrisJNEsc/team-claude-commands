@@ -71,16 +71,26 @@ Analyze feature description and determine:
 Present: **"Based on [feature], I recommend Team: [X], Priority: [Y]. Reasoning: [brief]. Correct?"**
 - Let user confirm or override team/priority in same interaction
 
-### 6. Create Linear Issue
+### 6. Preview Issue Before Creation
+Compile the complete issue description:
+- Use the ticket description template with all gathered information
+- Save to temporary markdown file: `/tmp/linear-issue-preview.md`
+- Open the file with: `open /tmp/linear-issue-preview.md` (opens in default markdown viewer/browser)
+- Display in chat: "Preview opened. Please review the issue details."
+- Ask: **"Proceed with creating this Linear issue? (yes/no)"**
+  - If no → ask what needs to be changed, update accordingly, show preview again
+  - If yes → continue to step 7
+
+### 7. Create Linear Issue
 Use `create_issue` with:
 - Team: from step 5
 - Title: from step 1
-- Description: formatted template (see below)
+- Description: formatted template (compiled in step 6)
 - Priority: from step 5 (Urgent=1, High=2, Normal=3, Low=4)
 - Label: "Bug - Customer Reported"
 - State: "Triage"
 
-### 7. Confirm Creation
+### 8. Confirm Creation
 Display: ticket ID, URL, git branch name
 
 ---
