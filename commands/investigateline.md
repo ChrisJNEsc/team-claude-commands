@@ -93,6 +93,141 @@ Use `create_issue` with:
 ### 8. Confirm Creation
 Display: ticket ID, URL, git branch name
 
+### 9. Optional: Implement Fix and Post Results
+After ticket creation, ask: **"Would you like me to implement the fix and test it?"**
+
+If yes, execute the following workflow:
+
+#### 9a. Setup Environment (First Time / If Needed)
+```bash
+# Ensure GitHub CLI has package access for npm
+gh auth refresh -h github.com -s read:packages
+
+# Navigate to repository and install dependencies
+cd ~/Documents/GitHub/[repository-name]
+npm ci
+```
+
+#### 9b. Create Feature Branch
+```bash
+git checkout main && git pull origin main
+git checkout -b [git-branch-name-from-ticket]
+```
+
+#### 9c. Implement the Fix
+Apply the changes from the fix plan documented in the ticket.
+
+#### 9d. Run Lint & Typecheck
+```bash
+# For Nx monorepo (jobnimbus-frontend)
+npx nx run [project]:lint
+npx nx run [project]:typecheck
+
+# For standard repos
+npm run lint
+npm run typecheck
+```
+Fix any errors before proceeding.
+
+#### 9e. Local Testing
+
+**For jobnimbus-frontend (single-spa microfrontend):**
+
+1. Start the dev server (run in background):
+   ```bash
+   npx nx run crm:serve:development &
+   ```
+   Wait for "webpack compiled" message (server at `http://localhost:9038/`)
+
+2. Test with import map override:
+   - Go to `https://dev.jobnimbus.com` in browser
+   - Open DevTools → Console
+   - Run:
+     ```javascript
+     localStorage.setItem('import-map-override:@jn/crm', 'http://localhost:9038/main.js')
+     ```
+   - Refresh the page
+   - Your local changes are now running in the dev environment
+
+3. Execute test plan from the ticket
+
+4. Revert override when done:
+   ```javascript
+   localStorage.removeItem('import-map-override:@jn/crm')
+   ```
+
+**For standard repositories:**
+```bash
+npm run test              # Run unit tests
+npm run build             # Verify build succeeds
+```
+
+Document test results (pass/fail with details).
+
+#### 9f. Commit & Push
+```bash
+git add [files]
+git commit -m "[type]([TICKET-ID]): [description]
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>"
+git push -u origin [branch-name]
+```
+
+#### 9g. Create or Update PR
+Check if PR exists first:
+```bash
+gh pr view [branch-name] --json number,url 2>&1
+```
+
+**If PR doesn't exist:**
+```bash
+gh pr create --title "[TICKET-ID]: [Brief description]" --body "## Summary
+[What was changed and why - include root cause analysis]
+
+## Changes
+- [List files changed with brief description]
+
+## Test Plan
+[Step-by-step verification instructions]
+
+## Linear Issue
+[ticket-url]
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)"
+```
+
+**If PR exists:** Update the description with `gh pr edit [number] --body "..."`
+
+#### 9h. Post Results to Linear Ticket
+Use `create_comment` to add implementation results to the ticket:
+
+```markdown
+## Implementation Complete ✅
+
+### Root Cause Analysis
+[Explanation of what was causing the issue]
+
+### Solution Implemented
+[Description of the fix and why it works]
+
+### Files Changed
+- `[file-path]` - [brief description of change]
+
+### Testing Results
+- Lint: ✅ Pass / ❌ Fail
+- Typecheck: ✅ Pass / ❌ Fail
+- Local Testing: ✅ Verified / ❌ Issues found
+
+### Branch & PR
+- **Branch:** `[branch-name]`
+- **PR:** [PR-URL]
+
+### Notes
+[Any issues encountered, deviations from fix plan, or additional context]
+```
+
 ---
 
 ## Ticket Description Template
