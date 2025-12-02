@@ -37,13 +37,24 @@ git submodule update --init --recursive
 
 ## Available Commands
 
-- `/bulk-pull` - Bulk update all repositories with git pull
-- `/devtools` - Dev Tools Doctor (Requires .har)
-- `/hscheck` - Hubspot Ticket Counter via Linear.
-- `/investigateline` - Check Duplicate Linears > Check GitHub + Gen Fix Plan > Create Linear
-- `/newreq` - Investigate line without searching GitHub
-- `/similar-issues` - Find similar issues in linear
-- `/triage` - Test Command
+| Command | Description |
+|---------|-------------|
+| `/bulk-pull` | Bulk update all repositories with git pull |
+| `/devtools` | Dev Tools Doctor (Requires .har) |
+| `/hscheck` | Hubspot Ticket Counter via Linear |
+| `/investigateline` | Create Linear ticket with duplicate check, code investigation (FE+BE), fix plan, and optional implementation |
+| `/newreq` | Create Linear ticket without code investigation |
+| `/similar-issues` | Find similar issues in Linear |
+| `/triage` | Test Command |
+
+## Shared Resources
+
+The `commands/shared/` folder contains lookup files loaded on-demand (Law 3):
+
+| File | Purpose |
+|------|---------|
+| `team-mapping.md` | Feature → Team ownership lookup |
+| `repo-mapping.md` | Feature → Repository + path hints for fast code investigation |
 
 ## Updating Commands
 
@@ -82,7 +93,8 @@ Brief description of what this command does.
 
 Detailed instructions for Claude to follow...
 ```
-##Token Efficiency Principles
+
+## Token Efficiency Principles
   - The 3 Laws:
   1. Minimize round trips → Batch questions, parallel tool calls
     - Bad: 10 sequential questions = 10 user waits + 10 AI responses
