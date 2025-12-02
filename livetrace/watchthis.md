@@ -10,7 +10,7 @@ Start Chrome with enhanced monitoring to investigate JobNimbus issues.
 
 2. **Start monitoring** by running:
    ```bash
-   /Users/garrett.young/.claude/scripts/monitor-chrome.sh
+   ~/Documents/GitHub/team-claude-commands/livetrace/monitor-chrome.sh
    ```
 
 3. **Wait silently** for the user to perform actions in Chrome
@@ -26,7 +26,7 @@ Start Chrome with enhanced monitoring to investigate JobNimbus issues.
      * Response bodies with unexpected values
      * Page navigation sequence (URL changes)
    - Identify the PRIMARY error or unexpected behavior first
-   - **Consult repository index** (`/Users/garrett.young/Documents/GitHub/REPOSITORY_INDEX.md`) to identify relevant repos
+   - **Consult repository index** (`~/Documents/GitHub/team-claude-commands/livetrace/REPOSITORY_INDEX.md`) to identify relevant repos
    - Map API endpoints and errors to specific repositories:
      * /api/* endpoints → jobnimbus-api (C# backend)
      * Frontend errors → relevant frontend repo based on URL/context

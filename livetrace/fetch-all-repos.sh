@@ -1,6 +1,6 @@
 #!/bin/bash
 
-GITHUB_DIR="/Users/garrett.young/Documents/GitHub"
+GITHUB_DIR="$HOME/Documents/GitHub"
 
 echo "📦 Pulling latest code from all repositories..."
 echo "================================"

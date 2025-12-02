@@ -7,7 +7,7 @@ Fetch the latest code from all JobNimbus repositories.
 Run the fetch script to pull the latest code from all repositories:
 
 ```bash
-/Users/garrett.young/.claude/scripts/fetch-all-repos.sh
+~/Documents/GitHub/team-claude-commands/livetrace/fetch-all-repos.sh
 ```
 
 Wait for the script to complete and report the results to the user.

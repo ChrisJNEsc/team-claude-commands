@@ -77,7 +77,8 @@ fi
 
 # Step 5: Start the console monitor
 echo "5. Starting console monitor..."
-python3 /Users/garrett.young/.claude/scripts/chrome-console-monitor-all-tabs.py > /tmp/monitor-output.log 2>&1 &
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+python3 "$SCRIPT_DIR/chrome-console-monitor-all-tabs.py" > /tmp/monitor-output.log 2>&1 &
 MONITOR_PID=$!
 echo $MONITOR_PID > "$MONITOR_PID_FILE"
 echo "   Monitor PID: $MONITOR_PID"
