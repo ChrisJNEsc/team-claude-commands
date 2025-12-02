@@ -42,7 +42,7 @@ git submodule update --init --recursive
 | `/bulk-pull` | Bulk update all repositories with git pull |
 | `/devtools` | Dev Tools Doctor (Requires .har) |
 | `/hscheck` | Hubspot Ticket Counter via Linear |
-| `/investigateline` | Create Linear ticket with duplicate check, code investigation (FE+BE), fix plan, and optional implementation |
+| `/investigateline` | Create Linear ticket with duplicate check, code investigation (FE+BE), fix plan, and optional implementation+local testing |
 | `/newreq` | Create Linear ticket without code investigation |
 | `/similar-issues` | Find similar issues in Linear |
 | `/triage` | Test Command |
@@ -119,5 +119,6 @@ Detailed instructions for Claude to follow...
 ## License
 
 [Choose your license - MIT, Apache 2.0, etc.]
+
 
 
