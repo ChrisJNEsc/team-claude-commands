@@ -1,314 +1,200 @@
 # Investigate and Create Customer Request Ticket
 
-Create a new Linear ticket for a customer-reported bug with optional code investigation and fix planning.
+Create Linear ticket for customer-reported bug with optional code investigation and fix.
 
-## Workflow
+---
 
-### 1. Gather Initial Information
-Ask the user for:
-- Ticket title (short, descriptive)
-- Feature description (what's affected - be specific)
+## Step 1: Initial Intake (ONE question)
 
-### 2. Check for Duplicates
-Search Linear for existing issues:
-- Extract key terms from title/feature (e.g., "invoice payment error" not "the invoice system has an error")
-- Use `list_issues` with: `query: [key terms]`, `limit: 10`, `orderBy: updatedAt`, `updatedAt: -P30D`
-- For each result, use `get_issue` to check full description
-- Analyze confidence: High/Medium/Low that each is a duplicate (explain why)
+Ask user for ALL of the following in a single prompt:
 
-If potential duplicates found:
-- Show: ID, title, status, URL, confidence assessment
-- Ask user: "Is this a duplicate?" (If yes → stop, provide URL. If no → continue)
-
-If no duplicates → continue to step 3
-
-### 3. Gather All Issue Details
-**Ask user to provide (in ONE question):**
-- Date & Time Issue Occurred
-- Company JN ID
-- User JN ID
-- Affected Record
-- Replicable in Customer's Account? (Y/N)
-- Replicable in Test Account? (Y/N)
-- Test Account Replicated in (if yes)
-- Record Replicated with (if yes)
-- Prerequisites (or "None")
-- Steps to Replicate (start with "Login to JobNimbus on [platform]...")
-- Expected Result
-- Actual Result
-- Steps to View (or "Same as replication")
-- Screenshots (URLs or "None")
-- User Recording/Zoom Meeting (URLs or "None")
-- Specific Troubleshooting (or "None")
-- Additional Information (or "None")
-
-### 4. Optional Code Investigation
-Ask once: **"Investigate code related to this issue?"**
-
-If yes:
-- Identify likely repository based on feature/area
-- Use Task tool (subagent_type=Explore) to locate relevant code
-- Present findings:
-  - Confidence level (High/Medium/Low) with reasoning (cross-reference JobNimbus architecture knowledge)
-  - Repository name
-  - File paths with line numbers
-  - Code snippets
-  - How code relates to issue
-- Ask once: **"Create fix plan?"**
-  - If yes → provide: Root cause, solution approach, files to modify, risks, testing recommendations
-
-Store investigation + fix plan for ticket description.
-
-### 5. AI Recommendation + User Override
-Analyze feature description and determine:
-- **Team**: Use team ownership logic (see mapping below when needed)
-- **Priority**: Based on impact/scope
-  - P1 (Urgent): Critical, multiple customers, blocking
-  - P2 (High): Significant customer impact
-  - P3 (Normal): Standard bug
-  - P4 (Low): Minor, minimal impact
-
-Present: **"Based on [feature], I recommend Team: [X], Priority: [Y]. Reasoning: [brief]. Correct?"**
-- Let user confirm or override team/priority in same interaction
-
-### 6. Preview Issue Before Creation
-Compile the complete issue description:
-- Use the ticket description template with all gathered information
-- Save to temporary markdown file: `/tmp/linear-issue-preview.md`
-- Open the file with: `open /tmp/linear-issue-preview.md` (opens in default markdown viewer/browser)
-- Display in chat: "Preview opened. Please review the issue details."
-- Ask: **"Proceed with creating this Linear issue? (yes/no)"**
-  - If no → ask what needs to be changed, update accordingly, show preview again
-  - If yes → continue to step 7
-
-### 7. Create Linear Issue
-Use `create_issue` with:
-- Team: from step 5
-- Title: from step 1
-- Description: formatted template (compiled in step 6)
-- Priority: from step 5 (Urgent=1, High=2, Normal=3, Low=4)
-- Label: "Bug - Customer Reported"
-- State: "Triage"
-
-### 8. Confirm Creation
-Display: ticket ID, URL, git branch name
-
-### 9. Optional: Implement Fix and Post Results
-After ticket creation, ask: **"Would you like me to implement the fix and test it?"**
-
-If yes, execute the following workflow:
-
-#### 9a. Setup Environment (First Time / If Needed)
-```bash
-# Ensure GitHub CLI has package access for npm
-gh auth refresh -h github.com -s read:packages
-
-# Navigate to repository and install dependencies
-cd ~/Documents/GitHub/[repository-name]
-npm ci
 ```
-
-#### 9b. Create Feature Branch
-```bash
-git checkout main && git pull origin main
-git checkout -b [git-branch-name-from-ticket]
-```
-
-#### 9c. Implement the Fix
-Apply the changes from the fix plan documented in the ticket.
-
-#### 9d. Run Lint & Typecheck
-```bash
-# For Nx monorepo (jobnimbus-frontend)
-npx nx run [project]:lint
-npx nx run [project]:typecheck
-
-# For standard repos
-npm run lint
-npm run typecheck
-```
-Fix any errors before proceeding.
-
-#### 9e. Local Testing
-
-**For jobnimbus-frontend (single-spa microfrontend):**
-
-1. Start the dev server (run in background):
-   ```bash
-   npx nx run crm:serve:development &
-   ```
-   Wait for "webpack compiled" message (server at `http://localhost:9038/`)
-
-2. Test with import map override:
-   - Go to `https://dev.jobnimbus.com` in browser
-   - Open DevTools → Console
-   - Run:
-     ```javascript
-     localStorage.setItem('import-map-override:@jn/crm', 'http://localhost:9038/main.js')
-     ```
-   - Refresh the page
-   - Your local changes are now running in the dev environment
-
-3. Execute test plan from the ticket
-
-4. Revert override when done:
-   ```javascript
-   localStorage.removeItem('import-map-override:@jn/crm')
-   ```
-
-**For standard repositories:**
-```bash
-npm run test              # Run unit tests
-npm run build             # Verify build succeeds
-```
-
-Document test results (pass/fail with details).
-
-#### 9f. Commit & Push
-```bash
-git add [files]
-git commit -m "[type]([TICKET-ID]): [description]
-
-🤖 Generated with [Claude Code](https://claude.com/claude-code)
-
-Co-Authored-By: Claude <noreply@anthropic.com>"
-git push -u origin [branch-name]
-```
-
-#### 9g. Create or Update PR
-Check if PR exists first:
-```bash
-gh pr view [branch-name] --json number,url 2>&1
-```
-
-**If PR doesn't exist:**
-```bash
-gh pr create --title "[TICKET-ID]: [Brief description]" --body "## Summary
-[What was changed and why - include root cause analysis]
-
-## Changes
-- [List files changed with brief description]
-
-## Test Plan
-[Step-by-step verification instructions]
-
-## Linear Issue
-[ticket-url]
-
-🤖 Generated with [Claude Code](https://claude.com/claude-code)"
-```
-
-**If PR exists:** Update the description with `gh pr edit [number] --body "..."`
-
-#### 9h. Post Results to Linear Ticket
-Use `create_comment` to add implementation results to the ticket:
-
-```markdown
-## Implementation Complete ✅
-
-### Root Cause Analysis
-[Explanation of what was causing the issue]
-
-### Solution Implemented
-[Description of the fix and why it works]
-
-### Files Changed
-- `[file-path]` - [brief description of change]
-
-### Testing Results
-- Lint: ✅ Pass / ❌ Fail
-- Typecheck: ✅ Pass / ❌ Fail
-- Local Testing: ✅ Verified / ❌ Issues found
-
-### Branch & PR
-- **Branch:** `[branch-name]`
-- **PR:** [PR-URL]
-
-### Notes
-[Any issues encountered, deviations from fix plan, or additional context]
+Title: [short, descriptive]
+Feature: [what's affected]
+Date/Time:
+Company JN ID:
+User JN ID:
+Affected Record:
+Replicable in Customer Account? [Y/N]
+Replicable in Test Account? [Y/N]
+Test Account ID: [if yes]
+Record Replicated: [if yes]
+Prerequisites: [or None]
+Steps to Replicate: [start with "Login to JobNimbus on..."]
+Expected Result:
+Actual Result:
+Steps to View: [or "Same as replication"]
+Screenshots: [URLs or None]
+Recording/Zoom: [URLs or None]
+Troubleshooting Done: [or None]
+Additional Info: [or None]
+---
+Options (Y/N for each):
+- Investigate code?
+- Implement fix after ticket creation?
 ```
 
 ---
 
-## Ticket Description Template
+## Step 2: Duplicate Check (parallel)
+
+Extract key terms → `list_issues` with `query`, `limit: 10`, `updatedAt: -P30D`
+
+**If matches found:** Show ID, title, status, URL, confidence (High/Medium/Low). Ask: "Duplicate? (yes=stop, no=continue)"
+
+**If no matches:** Continue.
+
+---
+
+## Step 3: Team & Priority (AI decides, user confirms)
+
+Infer team from feature. **Only read `shared/team-mapping.md` if unclear.**
+
+Priority: P1=blocking/critical | P2=significant | P3=standard | P4=minor
+
+Present: "Team: [X], Priority: [Y]. Correct? (or specify override)"
+
+---
+
+## Step 4: Code Investigation (if opted in)
+
+### 4a. Identify Repos
+Read `shared/repo-mapping.md` → lookup feature → get repo(s) + path hints.
+
+**Skip exploration if mapping gives clear path.** Only use Task(Explore) if:
+- Feature not in mapping
+- Path hint doesn't yield results
+- Need to trace cross-repo dependencies
+
+### 4b. Investigate (parallel if multiple repos)
+Use path hints to go directly to relevant files. Present per repo:
+Repository | Type | Confidence | Files:lines | How it relates
+
+### 4c. Fix Scope
+Classify: `Frontend-only` | `Backend-only` | `Full-stack`
+
+### 4d. Fix Plan (if scope identified)
+Per affected repo: Root cause | Solution | Files to modify | Risks | Tests
+
+### 4e. Confidence Assessment
+
+| Factor | Value |
+|--------|-------|
+| Root Cause | Yes/Partially/No |
+| Solution Clarity | Clear/Needs Validation/Uncertain |
+| Scope | Isolated/Moderate/Wide-reaching |
+| Test Coverage | Good/Partial/None |
+| **Overall** | **High/Medium/Low** |
+
+High=proceed | Medium=may iterate | Low=recommend manual validation first
+
+---
+
+## Step 5: Preview & Create
+
+1. Compile ticket using template below
+2. Save to `/tmp/linear-issue-preview.md` and `open` it
+3. Ask: "Create this ticket? (yes/edit/cancel)"
+4. Create with: `state: Triage`, `label: Bug - Customer Reported`
+5. Display: ticket ID, URL, branch name
+
+---
+
+## Step 6: Implementation (if opted in)
+
+Reference confidence from 4e. For full-stack: ask "Backend-first, frontend-first, or parallel?"
+
+### Frontend (jobnimbus-frontend)
+```bash
+cd ~/Documents/GitHub/jobnimbus-frontend && git checkout main && git pull && git checkout -b [branch]
+# implement fix
+npx nx run [project]:lint && npx nx run [project]:typecheck
+# test via import-map-override on dev.jobnimbus.com
+git add . && git commit -m "[type]([ID]): [desc]" && git push -u origin [branch]
+gh pr create --title "[ID]: [desc] (Frontend)" --body "[summary + test plan + linear link]"
+```
+
+### Backend (dotnet-monolith or other)
+```bash
+cd ~/Documents/GitHub/[repo] && git checkout main && git pull && git checkout -b [branch]
+# implement fix
+dotnet build && dotnet test  # or npm run build && npm test
+git add . && git commit -m "[type]([ID]): [desc]" && git push -u origin [branch]
+gh pr create --title "[ID]: [desc] (Backend)" --body "[summary + test plan + linear link]"
+```
+
+### Post to Linear
+Add comment with: Confidence assessment | Root cause | Solution | Files changed (FE/BE) | Test results table | PR links | Deployment notes
+
+---
+
+## Ticket Template
 
 ```
-**Description:** [Feature description]
-**Date & Time Issue Occurred:** [Date/Time]
-**Company JN ID:** [ID]
-**User JN ID:** [ID]
+**Description:** [Feature]
+**Date/Time:** [When]
+**Company JN ID:** [ID] | **User JN ID:** [ID]
 **Affected Record:** [Record]
 
-**Replicable in Customer's Account?** [Y/N]
-**Replicable in Test Account?** [Y/N]
-**Test Account Replicated in:** [ID or N/A]
-**Record Replicated with:** [Record or N/A]
+**Replication:**
+- Customer Account: [Y/N]
+- Test Account: [Y/N] → [Account ID] → [Record]
 
-**Prerequisites:**
-[Details or None]
+**Prerequisites:** [or None]
 
 **Steps to Replicate:**
 [Steps]
 
-**Expected Result:** [Expected]
-**Actual Result:** [Actual]
+**Expected:** [Result]
+**Actual:** [Result]
 
-**Steps to View:**
-[Steps or "Same as replication"]
+**Steps to View:** [or Same as replication]
 
-**Screenshots:** [URLs or None]
-**User Recording/Zoom Meeting:** [URLs or None]
-
-**Specific Troubleshooting:**
-[Details or None]
-
-**Additional Information:**
-[Details or None]
+**Attachments:** Screenshots: [URLs] | Recording: [URLs]
+**Troubleshooting:** [Done or None]
+**Additional:** [Info or None]
 
 ---
 
 ## Code Investigation
 
-**Confidence Level:** [High/Medium/Low with reasoning, or N/A]
-**Repository:** [Repo name or N/A]
-**Relevant Files:** [Files with line numbers, or N/A]
-**Code Analysis:** [Explanation or N/A]
+**Fix Scope:** [Frontend-only / Backend-only / Full-stack / N/A]
+
+### Frontend
+Repo: [name] | Confidence: [H/M/L] | Files: [paths:lines]
+Analysis: [explanation]
+
+### Backend
+Repo: [name] | Confidence: [H/M/L] | Files: [paths:lines]
+Analysis: [explanation]
+
+### Confidence: [High/Medium/Low]
+Root Cause: [Y/P/N] | Clarity: [C/V/U] | Scope: [I/M/W] | Tests: [G/P/N]
 
 ## Fix Plan
 
-**Root Cause:** [Analysis or N/A]
-**Proposed Solution:** [Approach or N/A]
-**Files to Modify:** [List or N/A]
-**Risks/Side Effects:** [Details or N/A]
-**Testing Recommendations:** [Tests or N/A]
+### Frontend
+Root Cause: [analysis]
+Solution: [approach]
+Files: [list]
+Risks: [details]
+Tests: [recommendations]
+
+### Backend
+Root Cause: [analysis]
+Solution: [approach]
+Files: [list]
+Risks: [details]
+Tests: [recommendations]
+
+**Deploy Order:** [Backend-first / Frontend-first / Parallel / N/A]
 ```
 
 ---
 
-## Team Ownership Mapping
-
-**Reference this when team is unclear from context:**
-
-| Team | Features | APIs | Settings |
-|------|----------|------|----------|
-| **Fulfillment** | Engage, Email, Material Orders, Notifications, @Mention, Products & Services, Work Orders | Beacon, ABC, SRS, Simplii, Podium | Suppliers |
-| **CoreCRM** | Boards, Contact/Job Details, Navigation/Search, Home Page, Tasks, Activity Feed, Calendar, Import Contacts, Photos, Documents, E-Signature, Forms | Public API, Zapier, Google Calendar, Outlook Calendar, CompanyCam, Google Maps | General, Automations, Features, Templates, Custom Fields, Task Type, Note Type, Workflows |
-| **Marketing** | Assist AI, Leads, Marketing Hub | Contractor Boost | Lead Source |
-| **Accounting** | Invoices, Credit Memos, Legacy Budgets, Profit Tracker, Legacy Proposals | QuickBooks | Tax |
-| **FinTech** | JobNimbus Payments, Manual Payments, Job Deposits, Payouts, Payments Dashboard | Global Pay, Wise Tack, Sunlight Financial, WePay | Payments, Financing |
-| **Sales** | NSE Estimates, Estimate Sidebar, Legacy Estimates, Smart Estimates, SumoQuote, Measurements, Layout Library, Insights, Classic Reports | EagleView, HOVER, mySalesman, NaturalForms, HailTrace, SalesRabbit, Xactimate, Leap | |
-| **Mobile** | iOS App, Android App | | |
-| **Account Platform** | Admin Panel, Feature Gating, Trial Accounts, Login/Authentication | | Access Profiles, Groups, Locations, Subscription, Teams |
-
-If still unclear, ask user to select from: Fulfillment, CoreCRM, Marketing, Accounting, FinTech, Sales, Mobile, Account Platform
-
----
-
-## Important Notes
-- Always check for duplicates before creating tickets
-- Always set state="Triage" and label="Bug - Customer Reported"
-- Code investigation is optional - ask once early in process
-- If investigation not performed, set those sections to "N/A"
-- Batch user questions to minimize interactions
-- Parallelize tool calls when no dependencies exist
-- Use N/A or None for missing fields
+## Rules
+- Batch questions → minimize interactions
+- Parallel tool calls when no dependencies
+- Load team-mapping.md only when team unclear
+- State=Triage, Label=Bug - Customer Reported
+- N/A for skipped sections
