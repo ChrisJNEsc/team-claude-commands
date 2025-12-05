@@ -41,8 +41,10 @@ git submodule update --init --recursive
 |---------|-------------|
 | `/bulk-pull` | Bulk update all repositories with git pull |
 | `/devtools` | Dev Tools Doctor (Requires .har) |
+| `/escalate` | Comprehensive escalations investigation with cascading searches and automated Linear ticket creation |
 | `/hscheck` | Hubspot Ticket Counter via Linear |
 | `/investigateline` | Create Linear ticket with duplicate check, code investigation (FE+BE), fix plan, and optional implementation+local testing |
+| `/lindone` | Validate Linear issue recommendations against branch commits and apply status labels |
 | `/newreq` | Create Linear ticket without code investigation |
 | `/similar-issues` | Find similar issues in Linear |
 | `/triage` | Test Command |
