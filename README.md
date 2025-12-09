@@ -48,6 +48,7 @@ git submodule update --init --recursive
 | `/newreq` | Create Linear ticket without code investigation |
 | `/similar-issues` | Find similar issues in Linear |
 | `/triage` | Test Command |
+| `/pr-status` | Show status of all my PRs grouped by status with linked Linear issues |
 
 ## Shared Resources
 
@@ -107,6 +108,24 @@ Detailed instructions for Claude to follow...
     - Best: Separate tool/file that AI calls only when needed
 
      
+## Permissions Setup
+
+Commands require certain permissions to run without prompts. See **[PERMISSIONS.md](PERMISSIONS.md)** for the full list.
+
+**Quick setup** - add to your `~/.claude/settings.json`:
+
+```json
+"Bash(gh pr list:*)",
+"Bash(gh search prs:*)",
+"Bash(gh api:*)",
+"Bash(gh repo list:*)",
+"mcp__plugin_engineering_linear__get_*",
+"mcp__plugin_engineering_linear__list_*",
+"mcp__plugin_engineering_linear__search_*"
+```
+
+Each command file includes a `permissions` frontmatter field listing its specific requirements.
+
 ## Troubleshooting
 
 **Commands not showing up?**
