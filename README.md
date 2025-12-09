@@ -58,6 +58,7 @@ The `commands/shared/` folder contains lookup files loaded on-demand (Law 3):
 |------|---------|
 | `team-mapping.md` | Feature → Team ownership lookup |
 | `repo-mapping.md` | Feature → Repository + path hints for fast code investigation |
+| [PERMISSIONS.md](PERMISSIONS.md) | Pre-approved permissions so commands run without confirmation prompts |
 
 ## Updating Commands
 
@@ -110,9 +111,9 @@ Detailed instructions for Claude to follow...
      
 ## Permissions Setup
 
-Commands require certain permissions to run without prompts. See **[PERMISSIONS.md](PERMISSIONS.md)** for the full list.
+By default, Claude Code asks for confirmation before running certain tools (GitHub CLI, Linear API, etc.). Adding permissions to your settings file lets commands run without these interruptions.
 
-**Quick setup** - add to your `~/.claude/settings.json`:
+**Quick setup** - add to your `~/.claude/settings.json` under `permissions.allow`:
 
 ```json
 "Bash(gh pr list:*)",
@@ -124,7 +125,7 @@ Commands require certain permissions to run without prompts. See **[PERMISSIONS.
 "mcp__plugin_engineering_linear__search_*"
 ```
 
-Each command file includes a `permissions` frontmatter field listing its specific requirements.
+See [PERMISSIONS.md](PERMISSIONS.md) for the full list including write operations (create/update). Some command files include a `permissions` frontmatter field listing their specific requirements.
 
 ## Troubleshooting
 
