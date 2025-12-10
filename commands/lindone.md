@@ -22,14 +22,19 @@ This command checks whether the specific recommended adjustments or changes desc
      - Implementation guidance section
    - **DO NOT use comments for recommendations** - only the issue description body
    - If no plan/recommendations are found in the description body, note this for step 11 (will default to "ESC - Plan Reworked")
+   - **Identify the issue creator** using `createdById` field
+   - Use mcp__plugin_engineering_linear__get_user to fetch the creator's email address
    - Identify the expected branch name from issue attachments or git branch name field
    - Note the issue's team prefix for repository correlation
 
-3. **DETERMINE TARGET BRANCH:**
+3. **DETERMINE TARGET PR/BRANCH:**
    - **If branch provided:** Use the specified branch name
-   - **If issue has git branch:** Use the attached branch name from Linear
+   - **If issue has PR attachments:** Select the PR created by the issue creator:
+     1. **Primary method (email matching):** For each PR attachment, use `gh pr view [PR-URL] --json author,commits` to get the PR author email and commit author emails. Match against the issue creator's email from step 2.
+     2. **Fallback method (attachment order):** If email matching fails (emails don't match or can't be retrieved), use the first PR attachment in the list (assumes the issue creator attached their PR first)
+   - **If issue has git branch but no PR:** Use the attached branch name from Linear
    - **If neither:** Construct expected branch name from issue ID (e.g., `feature/WEB-123-*` or `WEB-123-*`)
-   - Validate branch exists using: `git branch -a | grep [branch-pattern]`
+   - Validate branch/PR exists using: `gh pr view` or `git branch -a | grep [branch-pattern]`
 
 4. **IDENTIFY RECOMMENDED ADJUSTMENTS:**
    Parse the issue description and comments to extract specific recommendations:
