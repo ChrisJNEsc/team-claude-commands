@@ -188,10 +188,36 @@ Wait for approval.
 3. Minimal changes, match existing style
 4. Run lint/test/build
 5. Commit with Linear reference
-6. Push and create PR
-7. Link PR to Linear issue
 
-**C. Output:**
+**C. PR Confidence Summary (before posting):**
+
+Present summary for validation before pushing/posting:
+
+```
+📊 PR CONFIDENCE SUMMARY
+
+**PR:** #[num] - [title]
+**Branch:** support/[ID]-[desc]
+**Files Changed:** [count]
+
+| Metric | Score | Reasoning |
+|--------|-------|-----------|
+| Relevance | [X]% | [why this PR addresses the reported issue] |
+| Regression Risk | [Y]% | [likelihood this fix introduces new issues] |
+
+**Changes:**
+- [file:line] - [change description]
+- [file:line] - [change description]
+
+**Test Coverage:** [description of tests run/added]
+**Risk Factors:** [any concerns or edge cases]
+```
+
+**Ask: "Post this PR?"**
+- **Yes** → Push branch, create PR, link to Linear, then cleanup (checkout main, delete local branch)
+- **No** → Keep changes local for manual review
+
+**D. Output (after posting):**
 ```
 ✅ FIX COMPLETE
 Linear: [ID] - [url]
