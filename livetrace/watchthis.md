@@ -8,14 +8,22 @@ Start Chrome with enhanced monitoring to investigate JobNimbus issues.
    - Wait for their description
    - Store this context for analysis
 
-2. **Start monitoring** by running:
+2. **Check dependencies** before starting:
+   ```bash
+   python3 -c "import requests; import websocket" 2>/dev/null
+   ```
+   - If this fails (exit code non-zero), tell the user: "Missing Python dependencies. Please run `/team:livetrace-install` first."
+   - Do NOT proceed until dependencies are installed
+   - If it succeeds, continue silently (no output to user)
+
+3. **Start monitoring** by running:
    ```bash
    ~/Documents/GitHub/team-claude-commands/livetrace/monitor-chrome.sh
    ```
 
-3. **Wait silently** for the user to perform actions in Chrome
+4. **Wait silently** for the user to perform actions in Chrome
 
-4. **When user says "done"**:
+5. **When user says "done"**:
    - **First**: Stop the monitoring script (Ctrl+C or kill the background process)
    - **Then**: Read `/tmp/chrome-live-console.log`
    - Extract key patterns in priority order:
@@ -36,13 +44,13 @@ Start Chrome with enhanced monitoring to investigate JobNimbus issues.
    - Only read files that directly match the error or endpoint
    - Identify root causes
 
-5. **Ask user for required form fields**:
+6. **Ask user for required form fields**:
    - Ask: "What is the Company JN ID?"
    - Ask: "What is the User JN ID?"
    - Ask: "What is the Affected Record?"
    - Store these responses for the bug report form
 
-6. **Deliver** in this exact format:
+7. **Deliver** in this exact format:
 
    **PART 1: Bug Report Form** (at the top) - Fill using this priority:
    - Auto-fill from logs: Description, Date & Time, Steps to Replicate, Expected/Actual Result, Steps to View, Additional Information
@@ -98,7 +106,7 @@ Start Chrome with enhanced monitoring to investigate JobNimbus issues.
    - File paths and line numbers
    - Code explanation with full details
 
-7. **Create Linear Issue** (after delivering analysis):
+8. **Create Linear Issue** (after delivering analysis):
    - Search for relevant Linear teams using `mcp__plugin_engineering_linear__list_teams`
    - Based on the root cause and affected repositories, recommend the most appropriate team
    - Present recommendation to user: "I recommend creating this issue in the **[Team Name]** team because [reason]"
