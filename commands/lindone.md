@@ -158,13 +158,15 @@ This command checks whether the specific recommended adjustments or changes desc
     - Use mcp__plugin_engineering_linear__update_issue to add the appropriate label:
     - **If NO plan/recommendations were found in the description body:**
       - Add label: `ESC - Plan Reworked` (default when no plan exists)
-    - **If recommendations were found AND followed** (majority of adjustments are "Implemented"):
+    - **If 100% of the intended plan was implemented:**
       - Add label: `ESC - Plan Applied`
-    - **If recommendations were found but NOT followed** (majority are "Not Implemented" or "Differently Implemented"):
+      - Note: If the plan presented multiple options (e.g., Option A, B, C), 100% means the chosen option was fully implemented
+      - Note: If the plan listed sequential requirements, 100% means all requirements were implemented
+    - **If < 100% of the intended plan was implemented** (any adjustments are "Not Implemented", "Partially Implemented", or "Differently Implemented"):
       - Add label: `ESC - Plan Reworked`
     - Decision criteria:
-      - "Plan Applied" = Developer followed the recommended approach from the description body
-      - "Plan Reworked" = No plan existed OR developer took a different approach than recommended
+      - "Plan Applied" = Developer implemented 100% of the recommended plan (or chosen option) from the description body
+      - "Plan Reworked" = No plan existed OR developer did not implement all intended recommendations exactly
 
 **Example Usage:**
 - `/lindone WEB-123`
