@@ -1,16 +1,16 @@
 # Analyze-Bug Session: Estimate PDF Not Available
 
 **Date:** 2025-12-23
-**Command Version (Hash):** ba98a98
-**Linear Issue:** UNKNOWN (potentially related to SALES-659, SALES-795)
-**Classification:** Frontend
-**Outcome:** Investigation Only - User requested /save-session before ticket creation
+**Command Version (Hash):** 371156f
+**Linear Issue:** UNKNOWN (session saved before ticket creation)
+**Classification:** Backend
+**Outcome:** Investigation Only
 
 ---
 
 ## Session Summary
 
-Customer reported estimates showing "PDF not Available" error when attempting to view estimate PDFs. Investigation found this is likely related to existing issues SALES-659 (related entity routing) or SALES-795 (estimate corruption). Code analysis revealed the frontend's PDF query handler silently swallows API errors, masking the root cause.
+Customer reported estimates showing "PDF not Available" in the NSE (New Sales Experience) internal view. Investigation traced the issue through the frontend PDF iframe component to the backend ReportPdfService, identifying that the PDF endpoint `/api/v2/report/{id}/pdf` is failing for specific estimates, likely due to missing blob storage references or PDF generation failures.
 
 ---
 
@@ -20,116 +20,78 @@ Customer reported estimates showing "PDF not Available" error when attempting to
 > Support - Web Escalation
 >
 > Troubleshooting Steps Taken: Refresh Browser, Logout/Login, Check Browser Updates, Clear Cache, Incognito
->
 > Who Verified the Escalation? Chris Berry
->
+> Verified in person
 > Escalated By: JJ Repman Johnson
->
 > Brief Description of Issue: Estimates are showing as "PDF not Available"
->
 > User ID: m6qtiqdvzc47llkbne62hr2
->
 > Date/Time Issue Occurred: 12/18/2025
->
 > Specific Record Impacted: 17230 Estimate 9122
->
-> Steps to Replicate / Steps to View: Logged in via admin, tried again incognito
->
+> Steps to Replicate: Logged in via admin, tried again incognito
 > Expected Results: Estimate loads
->
 > Actual Results: page says pdf not available.
->
 > Can you Replicate in Logo's Account? Yes
->
 > Did you Test in Test Account? Yes
->
 > Can you Replicate in Test Account? No
->
-> Computer OS Type and Version: Windows 11 Pro
->
-> Browser Type and Version: Chrome
->
-> Additional Information: Screenshots from Logo in email thread
+> Computer OS Type: Windows 11 Pro
+> Browser: Chrome
 
-**Input 2: Next Step Decision**
-> /save-session
+**Input 2: Ticket Decision**
+> /save-session (chose to save session before creating ticket)
 
 ---
 
 ## Claude's Analysis & Thinking
 
 ### Classification
-- **Decision:** Frontend (with potential backend data issue)
-- **Confidence:** High
-- **Reasoning:** The "PDF not Available" message is rendered by frontend code, but the root cause is likely a backend API error being silently swallowed
+- **Decision:** Backend (with frontend display component)
+- **Confidence:** Medium
+- **Reasoning:** The "PDF not available" message is displayed by the frontend when the backend PDF API endpoint fails or returns an error. The root cause is in the backend service, but the frontend lacks detailed error messaging.
 
 ### Investigation Steps
-1. Extracted issue details from support escalation form
-2. Launched parallel subagents for:
-   - P1: Quick checks (duplicate search, documentation)
-   - P3: Code investigation (root cause analysis)
-3. Noted P2 reproduction was already completed by support (replicable in customer account, NOT in test account - indicating data-specific issue)
-4. Found high-confidence duplicate match (SALES-659) and medium-confidence match (SALES-795)
-5. Identified frontend code that silently swallows API errors
+
+1. **P1 Quick Checks:**
+   - Linear search: No exact duplicate found
+   - Related issues: SALES-118 (PDF preview component), SALES-688 (PDF endpoint - recently added)
+   - Support docs: No specific troubleshooting article for this error
+
+2. **P2 Reproduction:**
+   - Playwright auth blocked (requires login)
+   - Support already verified reproduction in Logo's account
+   - Marked as verified by support
+
+3. **P3 Code Investigation:**
+   - Traced "PDF not available" message to frontend component
+   - Identified backend PDF service flow
+   - Found recently added PDF endpoint (SALES-688, Dec 2025)
 
 ### Code Analysis
-- **Repository:** jobnimbus-frontend
+- **Repository:** jobnimbus-frontend, sumoquote
 - **Files Examined:**
-  - `libs/states/sales/src/lib/apis/estimates/estimates.queries.ts:274-282` - getSumoQuoteEstimatePdfLink query
-  - `libs/experiences/sales/src/lib/estimates/estimate-internal-view/estimate-internal-view.component.tsx` - PDF display component
-  - `libs/experiences/sales/src/lib/estimates/estimate-internal-view/components/estimate-pdf-preview.component.tsx` - PDF preview component
-- **Root Cause:** The `getSumoQuoteEstimatePdfLink` query's `responseHandler` doesn't validate HTTP response status before calling `.blob()`. When API returns error (404, 500, etc.), it silently fails and returns undefined, showing "PDF not available" instead of actual error.
+  - `estimate-pdf-iframe.component.tsx:57-75` - Shows "PDF not available" when pdfUrl is falsy
+  - `estimates.queries.ts:274-282` - RTK Query that fetches PDF, no error handling
+  - `ReportPdfService.cs:29-66` - Backend service with multiple failure points
+  - `ReportController.cs:38-52` - V2 API endpoint for PDF
+- **Root Cause:** Backend PDF endpoint failing for specific estimate. Possible causes:
+  1. SignedPDFId blob missing from Azure storage
+  2. PDF generation service failure
+  3. Report data preventing PDF generation
 
 ### Fix Proposal
-- **Approach:** Add response status validation and proper error handling to the responseHandler before processing blob
+- **Approach:**
+  1. Backend: Check if SignedPDFId exists and blob is accessible
+  2. Backend: Add better logging for PDF failures
+  3. Frontend (optional): Improve error messaging to show specific failure reason
 - **Files to Change:**
-  - `libs/states/sales/src/lib/apis/estimates/estimates.queries.ts:274-282`
-- **Risks:**
-  - UI needs updating to display new error messages appropriately
-  - Need unit tests for error handling scenarios (404, 500, empty blob)
-
-### Proposed Code Fix
-```typescript
-getSumoQuoteEstimatePdfLink: build.query<string, string>({
-  query: (estimateId) => ({
-    url: `${AppAuth.getSumoQuoteRoot()}/v2/report/${estimateId}/pdf`,
-    responseHandler: async (response) => {
-      // Validate response status before processing
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(
-          `Failed to fetch PDF: ${response.status} ${response.statusText}. ${errorText}`
-        );
-      }
-      const blob = await response.blob();
-      if (!blob || blob.size === 0) {
-        throw new Error('PDF response body is empty');
-      }
-      const url = URL.createObjectURL(blob);
-      if (!url) {
-        throw new Error('Failed to create object URL for PDF');
-      }
-      return url;
-    },
-  }),
-}),
-```
-
----
-
-## Related Issues Found
-
-| Issue | Confidence | Description |
-|-------|------------|-------------|
-| **SALES-659** | HIGH | Related Entity Estimates don't load - when viewing estimate from wrong entity context, route uses wrong projectId causing load failures |
-| **SALES-795** | MEDIUM | Estimate corruption - PublicQuoteId missing/corrupted, estimate won't load (created 2025-12-23) |
-| **SALES-747** | LOW | Logo missing from PDFs - different symptom but related to PDF generation |
+  - `ReportPdfService.cs` - Add logging
+  - `estimate-pdf-iframe.component.tsx` - Better error states
+- **Risks:** Data-specific issue may require manual intervention for affected estimate
 
 ---
 
 ## Outputs
 
-- **Linear Ticket:** Not created (session saved before ticket creation decision)
+- **Linear Ticket:** Not created (session saved before decision)
 - **PR Created:** Not created
 - **Branch:** N/A
 
@@ -137,13 +99,13 @@ getSumoQuoteEstimatePdfLink: build.query<string, string>({
 
 ## Key Learnings
 
-- "PDF not Available" error can have multiple root causes - need to determine if it's routing (SALES-659), corruption (SALES-795), or a new issue
-- The frontend silently swallows API errors in PDF queries, making debugging difficult - this should be fixed regardless of specific customer issue
-- Data-specific issues (replicable in customer account but NOT test account) often indicate corrupted data rather than code bugs
-- The `/escalate-v2` command successfully parallelized P1 (quick checks) and P3 (code investigation) subagents while skipping P2 (reproduction already done by support)
+- The NSE PDF preview feature was recently added (SALES-688, Dec 2025) and may have edge cases not yet handled
+- Frontend displays generic "PDF not available" without distinguishing between different failure modes (missing blob, generation failure, etc.)
+- Need to check Azure blob storage to verify if SignedPDFId references exist for problematic estimates
+- Consider adding more specific error messaging in the frontend to help diagnose issues faster
 
 ---
 
-*Session captured: 2025-12-23 12:00*
-*Command Version: ba98a98*
+*Session captured: 2025-12-23 11:00*
+*Command Version: 371156f*
 *Saved by /save-session*
