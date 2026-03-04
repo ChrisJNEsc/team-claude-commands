@@ -13,6 +13,10 @@ DEBUG_PORT = 9222
 
 active_connections = {}
 connection_lock = threading.Lock()
+# Track request URLs by requestId so we can label response bodies
+pending_requests = {}
+# ID range for response body requests (separate from POST data range)
+RESPONSE_BODY_ID_BASE = 50000
 
 def log(message):
     timestamp = datetime.now().isoformat()
@@ -60,13 +64,16 @@ def handle_message(ws, message, page_id, page_title):
             url = request.get('url', '')
             method = request.get('method', 'GET')
             # Only log JobNimbus API calls and page loads
-            if 'jobnimbus.com' in url and not any(x in url for x in ['static.jobnimbus.com', '.js', '.css', '.png', '.jpg', '.svg', '.woff']):
+            if ('jobnimbus.com' in url or 'sumoquote.com' in url) and not any(x in url for x in ['static.jobnimbus.com', '.js', '.css', '.png', '.jpg', '.svg', '.woff']):
+                # Track request URL for response body labeling
+                if request_id:
+                    pending_requests[request_id] = {'url': url, 'method': method}
                 log(f"[{page_title[:30]}] [API {method}] {url}")
                 # For POST requests, try to get the body data
                 if method == 'POST':
                     # First try inline postData
                     if request.get('postData'):
-                        post_data = request.get('postData', '')[:500]  # First 500 chars
+                        post_data = request.get('postData', '')
                         log(f"  POST Data: {post_data}")
                     # If not available inline, request it via CDP
                     elif request_id:
@@ -80,9 +87,36 @@ def handle_message(ws, message, page_id, page_title):
                             pass  # Ignore if we can't send the request
 
         # Handle responses to Network.getRequestPostData
-        elif data.get('id') and data.get('id') >= 999 and data.get('result', {}).get('postData'):
-            post_data = data.get('result', {}).get('postData', '')[:500]  # First 500 chars
+        elif data.get('id') and 999 <= data.get('id', 0) < RESPONSE_BODY_ID_BASE and data.get('result', {}).get('postData'):
+            post_data = data.get('result', {}).get('postData', '')
             log(f"  POST Data: {post_data}")
+
+        # Handle responses to Network.getResponseBody
+        elif data.get('id') and data.get('id', 0) >= RESPONSE_BODY_ID_BASE and 'result' in data:
+            result = data.get('result', {})
+            body = result.get('body', '')
+            base64_encoded = result.get('base64Encoded', False)
+            if body and not base64_encoded:
+                # Look up the original request URL for context
+                msg_id = data.get('id', 0)
+                req_id_hash = msg_id - RESPONSE_BODY_ID_BASE
+                log(f"  Response Body: {body}")
+
+        # Network loading finished - request response body for tracked JN API calls
+        elif data.get('method') == 'Network.loadingFinished':
+            request_id = data.get('params', {}).get('requestId', '')
+            if request_id in pending_requests:
+                try:
+                    ws.send(json.dumps({
+                        "id": RESPONSE_BODY_ID_BASE + hash(request_id) % 10000,
+                        "method": "Network.getResponseBody",
+                        "params": {"requestId": request_id}
+                    }))
+                except:
+                    pass
+                finally:
+                    # Clean up tracked request
+                    del pending_requests[request_id]
 
         # Console API messages
         elif data.get('method') == 'Runtime.consoleAPICalled':
@@ -142,13 +176,32 @@ def handle_message(ws, message, page_id, page_title):
                 error_text = params.get('errorText', 'Unknown error')
                 log(f"[{page_title[:30]}] [NETWORK FAILED] {error_text}")
 
+        # Auto-attached target (iframe, worker) - enable network monitoring on it
+        elif data.get('method') == 'Target.attachedToTarget':
+            session_id = data.get('params', {}).get('sessionId', '')
+            target_info = data.get('params', {}).get('targetInfo', {})
+            target_url = target_info.get('url', '')
+            target_type = target_info.get('type', '')
+            if session_id:
+                try:
+                    # Enable Network and Runtime on the attached target via its session
+                    for domain_id, domain in [(10, "Network.enable"), (11, "Runtime.enable"), (12, "Console.enable")]:
+                        ws.send(json.dumps({
+                            "id": domain_id,
+                            "sessionId": session_id,
+                            "method": domain
+                        }))
+                    log(f"[{page_title[:30]}] [IFRAME ATTACHED] {target_type}: {target_url[:80]}")
+                except:
+                    pass
+
         # Network responses
         elif data.get('method') == 'Network.responseReceived':
             response = data.get('params', {}).get('response', {})
             status = response.get('status', 200)
             url = response.get('url', 'unknown')
             # Log all JobNimbus API responses
-            if 'jobnimbus.com' in url and not any(x in url for x in ['static.jobnimbus.com', '.js', '.css', '.png', '.jpg', '.svg', '.woff']):
+            if ('jobnimbus.com' in url or 'sumoquote.com' in url) and not any(x in url for x in ['static.jobnimbus.com', '.js', '.css', '.png', '.jpg', '.svg', '.woff']):
                 log(f"[{page_title[:30]}] [RESPONSE {status}] {url}")
             # Also log non-JobNimbus errors
             elif status >= 400:
@@ -186,7 +239,13 @@ def monitor_page(page):
             ws.send(json.dumps({"id": 3, "method": "Log.enable"}))
             ws.send(json.dumps({"id": 4, "method": "Network.enable"}))
             ws.send(json.dumps({"id": 5, "method": "Page.enable"}))
-            log(f"[{page_title[:30]}] Monitoring enabled (Console, Runtime, Log, Network, Page)")
+            # Auto-attach to iframes/workers so we capture their network requests too
+            ws.send(json.dumps({"id": 6, "method": "Target.setAutoAttach", "params": {
+                "autoAttach": True,
+                "waitForDebuggerOnStart": False,
+                "flatten": True
+            }}))
+            log(f"[{page_title[:30]}] Monitoring enabled (Console, Runtime, Log, Network, Page, Iframes)")
 
         ws = websocket.WebSocketApp(
             ws_url,
