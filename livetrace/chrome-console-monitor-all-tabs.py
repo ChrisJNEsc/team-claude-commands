@@ -7,6 +7,7 @@ import threading
 import time
 import sys
 from datetime import datetime
+from urllib.parse import urlparse
 
 LOG_FILE = '/tmp/chrome-live-console.log'
 DEBUG_PORT = 9222
@@ -17,6 +18,70 @@ connection_lock = threading.Lock()
 pending_requests = {}
 # ID range for response body requests (separate from POST data range)
 RESPONSE_BODY_ID_BASE = 50000
+
+# --- Constants ---
+
+STATIC_EXTENSIONS = [
+    '.js', '.css', '.png', '.jpg', '.jpeg', '.svg', '.woff', '.woff2',
+    '.ttf', '.eot', '.gif', '.ico', '.map', '.webp',
+]
+
+SKIP_URL_PREFIXES = ['data:', 'chrome-extension://']
+
+DOMAIN_TAGS = {
+    'JN': ['jobnimbus.com'],
+    'SQ': ['sumoquote.com'],
+    'SUPPLIER': ['abcsupply.com', 'beacon', 'srs', 'supplier'],
+    'MEASURE': ['eagleview', 'hover.to', 'hoverapi', 'hover.com'],
+    'FINANCE': ['wisetack', 'financing'],
+}
+
+ESTIMATE_FLOW_PATTERNS = {
+    'ESTIMATE': ['/estimate', '/report/', '/estimates'],
+    'LAYOUT': ['/layouts', '/layout'],
+    'SIGNING': ['/signing', '/reviewQuote', '/signQuote', '/publicreviewhub', '/manuallySign', '/inperson'],
+    'TEMPLATE': ['/template', '/gettemplate'],
+    'MEASUREMENT': ['/measurement', '/thirdPartyMeasurement', '/measurementprovider'],
+    'FINANCING': ['/financing', '/wisetack', '/payment-link', '/monthly-payment'],
+    'MATERIAL': ['/material', '/suppliers', '/products', '/branches'],
+    'PROPOSAL': ['/proposals'],
+    'SIGNATURE': ['/possiblesigners', '/signingurl', '/dsigndocument', '/digitalsignature'],
+    'PDF': ['/pdf', '/download', '/regenerateQuote'],
+    'TAX': ['/tax'],
+}
+
+BODY_METHODS = {'POST', 'PUT', 'PATCH', 'DELETE'}
+
+
+def get_domain_tag(url):
+    """Categorize a URL by domain."""
+    url_lower = url.lower()
+    for tag, patterns in DOMAIN_TAGS.items():
+        if any(p in url_lower for p in patterns):
+            return tag
+    return 'EXT'
+
+
+def get_flow_tag(url):
+    """Return an estimate flow tag if the URL matches known patterns, or empty string."""
+    url_lower = url.lower()
+    for tag, patterns in ESTIMATE_FLOW_PATTERNS.items():
+        if any(p in url_lower for p in patterns):
+            return tag
+    return ''
+
+
+def should_skip_url(url):
+    """Return True if the URL is a static asset or should be skipped."""
+    if any(url.startswith(prefix) for prefix in SKIP_URL_PREFIXES):
+        return True
+    if 'static.jobnimbus.com' in url:
+        return True
+    url_lower = url.lower()
+    # Check path portion only (ignore query params)
+    path = url_lower.split('?')[0]
+    return any(path.endswith(ext) for ext in STATIC_EXTENSIONS)
+
 
 def log(message):
     timestamp = datetime.now().isoformat()
@@ -41,41 +106,50 @@ def handle_message(ws, message, page_id, page_title):
     """Handle messages from a specific page"""
     try:
         data = json.loads(message)
+        method = data.get('method', '')
 
         # Page navigation events
-        if data.get('method') == 'Page.frameNavigated':
+        if method == 'Page.frameNavigated':
             frame = data.get('params', {}).get('frame', {})
             url = frame.get('url', '')
-            # Only log JobNimbus navigation
-            if 'jobnimbus.com' in url and not url.startswith('https://static.'):
-                log(f"[{page_title[:30]}] [NAVIGATION] {url}")
+            if url and not url.startswith('data:') and not url.startswith('chrome-extension://'):
+                tag = get_domain_tag(url)
+                log(f"[{page_title[:30]}] [NAVIGATION] [{tag}] {url}")
 
         # Document lifecycle events
-        elif data.get('method') == 'Page.lifecycleEvent':
+        elif method == 'Page.lifecycleEvent':
             params = data.get('params', {})
             event_name = params.get('name', '')
             if event_name in ['DOMContentLoaded', 'load']:
                 log(f"[{page_title[:30]}] [PAGE LIFECYCLE] {event_name}")
 
-        # Network requests - log all JobNimbus API calls
-        elif data.get('method') == 'Network.requestWillBeSent':
+        # Network requests - log ALL API calls (filtered for static assets)
+        elif method == 'Network.requestWillBeSent':
             request = data.get('params', {}).get('request', {})
             request_id = data.get('params', {}).get('requestId', '')
             url = request.get('url', '')
-            method = request.get('method', 'GET')
-            # Only log JobNimbus API calls and page loads
-            if ('jobnimbus.com' in url or 'sumoquote.com' in url) and not any(x in url for x in ['static.jobnimbus.com', '.js', '.css', '.png', '.jpg', '.svg', '.woff']):
-                # Track request URL for response body labeling
+            req_method = request.get('method', 'GET')
+
+            if not should_skip_url(url):
+                domain_tag = get_domain_tag(url)
+                flow_tag = get_flow_tag(url)
+                flow_str = f" [{flow_tag}]" if flow_tag else ''
+
+                # Track request for response body labeling and timing
                 if request_id:
-                    pending_requests[request_id] = {'url': url, 'method': method}
-                log(f"[{page_title[:30]}] [API {method}] {url}")
-                # For POST requests, try to get the body data
-                if method == 'POST':
-                    # First try inline postData
+                    pending_requests[request_id] = {
+                        'url': url,
+                        'method': req_method,
+                        'start_time': time.monotonic(),
+                    }
+
+                log(f"[{page_title[:30]}] [API {req_method}] [{domain_tag}]{flow_str} {url}")
+
+                # Capture request bodies for POST, PUT, PATCH, DELETE
+                if req_method in BODY_METHODS:
                     if request.get('postData'):
                         post_data = request.get('postData', '')
-                        log(f"  POST Data: {post_data}")
-                    # If not available inline, request it via CDP
+                        log(f"  Request Body: {post_data}")
                     elif request_id:
                         try:
                             ws.send(json.dumps({
@@ -84,12 +158,12 @@ def handle_message(ws, message, page_id, page_title):
                                 "params": {"requestId": request_id}
                             }))
                         except:
-                            pass  # Ignore if we can't send the request
+                            pass
 
         # Handle responses to Network.getRequestPostData
         elif data.get('id') and 999 <= data.get('id', 0) < RESPONSE_BODY_ID_BASE and data.get('result', {}).get('postData'):
             post_data = data.get('result', {}).get('postData', '')
-            log(f"  POST Data: {post_data}")
+            log(f"  Request Body: {post_data}")
 
         # Handle responses to Network.getResponseBody
         elif data.get('id') and data.get('id', 0) >= RESPONSE_BODY_ID_BASE and 'result' in data:
@@ -97,13 +171,19 @@ def handle_message(ws, message, page_id, page_title):
             body = result.get('body', '')
             base64_encoded = result.get('base64Encoded', False)
             if body and not base64_encoded:
-                # Look up the original request URL for context
+                # Look up original request URL from the stashed info
                 msg_id = data.get('id', 0)
-                req_id_hash = msg_id - RESPONSE_BODY_ID_BASE
-                log(f"  Response Body: {body}")
+                req_hash = msg_id - RESPONSE_BODY_ID_BASE
+                # Find matching request by hash
+                source_label = ''
+                for rid, info in list(pending_requests.items()):
+                    if hash(rid) % 10000 == req_hash:
+                        source_label = f" for [{info['method']} {info['url']}]"
+                        break
+                log(f"  Response Body{source_label}: {body}")
 
-        # Network loading finished - request response body for tracked JN API calls
-        elif data.get('method') == 'Network.loadingFinished':
+        # Network loading finished - request response body for tracked API calls
+        elif method == 'Network.loadingFinished':
             request_id = data.get('params', {}).get('requestId', '')
             if request_id in pending_requests:
                 try:
@@ -114,12 +194,55 @@ def handle_message(ws, message, page_id, page_title):
                     }))
                 except:
                     pass
-                finally:
-                    # Clean up tracked request
-                    del pending_requests[request_id]
+                # Don't delete yet - we need the info for response body labeling
+                # It will be cleaned up after the response body arrives or on timeout
+
+        # Network responses - with timing
+        elif method == 'Network.responseReceived':
+            response = data.get('params', {}).get('response', {})
+            status = response.get('status', 200)
+            url = response.get('url', 'unknown')
+            request_id = data.get('params', {}).get('requestId', '')
+
+            if not should_skip_url(url):
+                domain_tag = get_domain_tag(url)
+                flow_tag = get_flow_tag(url)
+                flow_str = f" [{flow_tag}]" if flow_tag else ''
+
+                # Calculate timing
+                timing_str = ''
+                if request_id and request_id in pending_requests:
+                    start_time = pending_requests[request_id].get('start_time')
+                    if start_time:
+                        duration_ms = int((time.monotonic() - start_time) * 1000)
+                        timing_str = f" [{duration_ms}ms]"
+
+                log(f"[{page_title[:30]}] [RESPONSE {status}] [{domain_tag}]{flow_str}{timing_str} {url}")
+
+        # WebSocket events
+        elif method == 'Network.webSocketCreated':
+            params = data.get('params', {})
+            url = params.get('url', '')
+            log(f"[{page_title[:30]}] [WEBSOCKET OPENED] {url}")
+
+        elif method == 'Network.webSocketFrameReceived':
+            params = data.get('params', {})
+            payload = params.get('response', {}).get('payloadData', '')
+            if payload:
+                log(f"[{page_title[:30]}] [WEBSOCKET RECV] {payload}")
+
+        elif method == 'Network.webSocketFrameSent':
+            params = data.get('params', {})
+            payload = params.get('response', {}).get('payloadData', '')
+            if payload:
+                log(f"[{page_title[:30]}] [WEBSOCKET SENT] {payload}")
+
+        elif method == 'Network.webSocketClosed':
+            params = data.get('params', {})
+            log(f"[{page_title[:30]}] [WEBSOCKET CLOSED]")
 
         # Console API messages
-        elif data.get('method') == 'Runtime.consoleAPICalled':
+        elif method == 'Runtime.consoleAPICalled':
             params = data.get('params', {})
             msg_type = params.get('type', 'log')
             args = params.get('args', [])
@@ -140,7 +263,7 @@ def handle_message(ws, message, page_id, page_title):
                 log(f"  Stack: {frame.get('url', 'unknown')}:{frame.get('lineNumber', '?')}")
 
         # Runtime exceptions
-        elif data.get('method') == 'Runtime.exceptionThrown':
+        elif method == 'Runtime.exceptionThrown':
             details = data.get('params', {}).get('exceptionDetails', {})
             log(f"[{page_title[:30]}] [ERROR] {details.get('text', 'Unknown error')}")
 
@@ -158,7 +281,7 @@ def handle_message(ws, message, page_id, page_title):
                     log(f"    at {func_name} ({url}:{line}:{col})")
 
         # Log entries
-        elif data.get('method') == 'Log.entryAdded':
+        elif method == 'Log.entryAdded':
             entry = data.get('params', {}).get('entry', {})
             level = entry.get('level', 'info')
             text = entry.get('text', '')
@@ -170,14 +293,18 @@ def handle_message(ws, message, page_id, page_title):
                 log(f"  Source: {url}:{line_number}")
 
         # Network failures
-        elif data.get('method') == 'Network.loadingFailed':
+        elif method == 'Network.loadingFailed':
             params = data.get('params', {})
+            request_id = params.get('requestId', '')
             if not params.get('canceled', False):
                 error_text = params.get('errorText', 'Unknown error')
                 log(f"[{page_title[:30]}] [NETWORK FAILED] {error_text}")
+            # Clean up pending request on failure
+            if request_id in pending_requests:
+                del pending_requests[request_id]
 
         # Auto-attached target (iframe, worker) - enable network monitoring on it
-        elif data.get('method') == 'Target.attachedToTarget':
+        elif method == 'Target.attachedToTarget':
             session_id = data.get('params', {}).get('sessionId', '')
             target_info = data.get('params', {}).get('targetInfo', {})
             target_url = target_info.get('url', '')
@@ -194,18 +321,6 @@ def handle_message(ws, message, page_id, page_title):
                     log(f"[{page_title[:30]}] [IFRAME ATTACHED] {target_type}: {target_url[:80]}")
                 except:
                     pass
-
-        # Network responses
-        elif data.get('method') == 'Network.responseReceived':
-            response = data.get('params', {}).get('response', {})
-            status = response.get('status', 200)
-            url = response.get('url', 'unknown')
-            # Log all JobNimbus API responses
-            if ('jobnimbus.com' in url or 'sumoquote.com' in url) and not any(x in url for x in ['static.jobnimbus.com', '.js', '.css', '.png', '.jpg', '.svg', '.woff']):
-                log(f"[{page_title[:30]}] [RESPONSE {status}] {url}")
-            # Also log non-JobNimbus errors
-            elif status >= 400:
-                log(f"[{page_title[:30]}] [HTTP {status}] {url}")
 
     except Exception as e:
         pass  # Ignore parse errors
@@ -245,7 +360,7 @@ def monitor_page(page):
                 "waitForDebuggerOnStart": False,
                 "flatten": True
             }}))
-            log(f"[{page_title[:30]}] Monitoring enabled (Console, Runtime, Log, Network, Page, Iframes)")
+            log(f"[{page_title[:30]}] Monitoring enabled (Console, Runtime, Log, Network, Page, WebSocket, Iframes)")
 
         ws = websocket.WebSocketApp(
             ws_url,
@@ -293,10 +408,17 @@ def discover_and_monitor():
             time.sleep(2)
 
 def main():
-    # Initialize log file
+    # Initialize log file with session metadata
     with open(LOG_FILE, 'w') as f:
         f.write(f"Chrome Console Monitor (All Tabs) Started - {datetime.now().isoformat()}\n")
         f.write("=" * 80 + "\n\n")
+        f.write("=== LIVETRACE SESSION ===\n")
+        f.write("Capture: ALL domains (tagged by category)\n")
+        f.write("Bodies: Full request/response bodies (POST/PUT/PATCH/DELETE)\n")
+        f.write("WebSocket: SignalR and WS frames captured\n")
+        f.write("Timing: Request duration in ms\n")
+        f.write("Tags: JN, SQ, SUPPLIER, MEASURE, FINANCE, ESTIMATE, LAYOUT, SIGNING, TEMPLATE, MEASUREMENT, FINANCING, MATERIAL, PROPOSAL, SIGNATURE, PDF, TAX, EXT\n")
+        f.write("========================\n\n")
 
     try:
         log("Starting multi-tab console monitor...")
