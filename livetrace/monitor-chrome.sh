@@ -22,6 +22,29 @@ fi
 
 # Kill any processes using port 9222
 if lsof -ti:9222 > /dev/null 2>&1; then
+  PORT_PIDS=$(lsof -ti:9222)
+  RISKY=false
+  for PID in $PORT_PIDS; do
+    CMDLINE=$(ps -p "$PID" -o args= 2>/dev/null || true)
+    if echo "$CMDLINE" | grep -q "chrome-debug-profile"; then
+      : # Safe - this is a previous livetrace debug instance
+    elif [ -n "$CMDLINE" ]; then
+      RISKY=true
+    fi
+  done
+
+  if [ "$RISKY" = true ]; then
+    echo ""
+    echo "   ⚠️  Port 9222 is in use by a process that may be tied to your regular Chrome session."
+    echo "   Killing it could close existing tabs."
+    echo ""
+    read -p "   Proceed with cleanup? (y/n): " CONFIRM
+    if [ "$CONFIRM" != "y" ] && [ "$CONFIRM" != "Y" ]; then
+      echo "   Aborted. Close Chrome or free port 9222 manually, then retry."
+      exit 1
+    fi
+  fi
+
   echo "   Freeing port 9222..."
   lsof -ti:9222 | xargs kill -9 2>/dev/null
   sleep 1
@@ -50,6 +73,11 @@ echo "2. Launching Chrome with remote debugging..."
 TEMP_PROFILE="/tmp/chrome-debug-profile-$$"
 mkdir -p "$TEMP_PROFILE"
 
+# NOTE: On macOS, Chrome may ignore --user-data-dir for its singleton lock and attach
+# to the existing main process instead of spawning a separate one. When that happens,
+# port 9222 ends up owned by regular Chrome, and the cleanup kill -9 crashes all tabs.
+# If the port check above isn't enough, forcing a unique TMPDIR isolates the singleton:
+#   TMPDIR="$TEMP_PROFILE/tmp" /Applications/Google\ Chrome.app/...
 /Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome \
   --remote-debugging-port=9222 \
   --remote-allow-origins=* \
